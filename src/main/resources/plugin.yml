@@ -1,0 +1,19 @@
+name: InventoryHolder
+version: 1.0.0-SNAPSHOT
+author: elsiff
+main: me.elsiff.inventoryholder.InventoryHolder
+commands:
+  inventoryholder:
+    description: Main command for InventoryHolder.
+    usage: /inventoryholder
+    aliases: [ih, invh, invholder]
+permissions:
+  invholder.save:
+    default: op
+    description: Player with this permission can save thier inventory as a kit.
+  invholder.load:
+    default: op
+    description: Player with this permission can load any kits.
+  invholder.force:
+    default: op
+    description: Player with this permission can force other players to get a kit.
