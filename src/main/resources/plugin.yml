@@ -8,12 +8,9 @@ commands:
     usage: /inventoryholder
     aliases: [ih, invh, invholder]
 permissions:
-  invholder.save:
+  invholder.admin:
     default: op
-    description: Player with this permission can save thier inventory as a kit.
+    description: Player with this permission can use the all commands.
   invholder.load:
     default: op
     description: Player with this permission can load any kits.
-  invholder.force:
-    default: op
-    description: Player with this permission can force other players to get a kit.

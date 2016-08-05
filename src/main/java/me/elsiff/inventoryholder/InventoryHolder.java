@@ -3,6 +3,7 @@ package me.elsiff.inventoryholder;
 import com.google.common.base.Preconditions;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -41,7 +42,7 @@ public class InventoryHolder extends JavaPlugin {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String label, String[] args) {
         List<String> list = new ArrayList<String>();
 
-        if (args.length < 2 ) {
+        if (args.length < 2) {
             list.add("list");
 
             if (sender.hasPermission("inventoryholder.save")) {
@@ -51,6 +52,14 @@ public class InventoryHolder extends JavaPlugin {
             if (sender.hasPermission("inventoryholder.load")) {
                 list.add("load");
             }
+        } else if ((args.length == 2 && args[0].equalsIgnoreCase("load")) || (args.length == 3 && args[0].equalsIgnoreCase("force"))) {
+            for (String kit : getKits()) {
+                list.add(kit);
+            }
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("force")) {
+            for (Player player : getServer().getOnlinePlayers()) {
+                list.add(player.getName());
+            }
         }
 
         String finalArg = args[args.length - 1];
@@ -59,6 +68,20 @@ public class InventoryHolder extends JavaPlugin {
             if (!it.next().startsWith(finalArg)) {
                 it.remove();
             }
+        }
+
+        return list;
+    }
+
+    public List<String> getKits() {
+        List<String> list = new ArrayList<String>();
+
+        File[] files = getDataFolder().listFiles();
+        Preconditions.checkNotNull(files);
+
+        for (File file : files) {
+            String name = file.getName();
+            list.add(name.substring(0, name.length() - 4));
         }
 
         return list;
@@ -80,9 +103,9 @@ public class InventoryHolder extends JavaPlugin {
 
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);
 
-        config.set("storage", inv.getStorageContents());
-        config.set("armor", inv.getArmorContents());
-        config.set("extra", inv.getExtraContents());
+        setContents(config, "storage", inv.getStorageContents());
+        setContents(config, "armor", inv.getArmorContents());
+        setContents(config, "extra", inv.getExtraContents());
 
         config.save(file);
     }
@@ -93,52 +116,76 @@ public class InventoryHolder extends JavaPlugin {
 
         ItemStack[] storage = null, armor = null, extra = null;
 
+        int lengthStorage = inv.getStorageContents().length;
+        int lengthArmor = inv.getArmorContents().length;
+        int lengthExtra = inv.getExtraContents().length;
+
         if (config.contains("storage"))
-            storage = (ItemStack[]) config.get("storage");
+            storage = getContents(config, "storage", lengthStorage);
 
         if (config.contains("armor"))
-            armor = (ItemStack[]) config.get("armor");
+            armor = getContents(config, "armor", lengthArmor);
 
         if (config.contains("extra"))
-            extra = (ItemStack[]) config.get("extra");
+            extra = getContents(config, "extra", lengthExtra);
 
-        inv.setStorageContents(storage != null ? storage : new ItemStack[inv.getStorageContents().length]);
-        inv.setArmorContents(armor != null ? armor : new ItemStack[inv.getArmorContents().length]);
-        inv.setExtraContents(extra != null ? extra : new ItemStack[inv.getExtraContents().length]);
+        inv.setStorageContents(storage != null ? storage : new ItemStack[lengthStorage]);
+        inv.setArmorContents(armor != null ? armor : new ItemStack[lengthArmor]);
+        inv.setExtraContents(extra != null ? extra : new ItemStack[lengthExtra]);
+    }
+
+    private void setContents(FileConfiguration config, String path, ItemStack[] contents) {
+        for (int i = 0; i < contents.length; i ++) {
+            config.set(path + ".num_" + i, contents[i]);
+        }
+    }
+
+    private ItemStack[] getContents(FileConfiguration config, String path, int length) {
+        ConfigurationSection section = config.getConfigurationSection(path);
+        ItemStack[] contents = new ItemStack[length];
+
+        for (String id : section.getKeys(false)) {
+            ItemStack item = section.getItemStack(id);
+            int i = Integer.parseInt(id.substring(4));
+
+            contents[i] = item;
+        }
+
+        return contents;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (args.length < 1 || args[0].equalsIgnoreCase("help")) {
-            sender.sendMessage(prefix + "§3> ===== §b§lInventoryHolder §bv" + getDescription().getVersion() + "§3 ===== <");
+            sender.sendMessage(prefix + "§3> ===== §b§lInventoryHolder §3 ===== <");
             sender.sendMessage(prefix + "/" + label + " help");
             sender.sendMessage(prefix + "/" + label + " list");
             sender.sendMessage(prefix + "/" + label + " save <kitName>");
+            sender.sendMessage(prefix + "/" + label + " delete <kitName>");
             sender.sendMessage(prefix + "/" + label + " load <kitName>");
             sender.sendMessage(prefix + "/" + label + " force <player> <kitName>");
 
             return true;
         } else if (args[0].equalsIgnoreCase("list")) {
-            File[] files = getDataFolder().listFiles();
-            Preconditions.checkNotNull(files);
+            List<String> list = getKits();
 
-            if (files.length == 0) {
-                sender.sendMessage(prefix + "There's no kit yet. Try '/invh save <name>'");
+            if (list.size() == 0) {
+                sender.sendMessage(prefix + "There're no kits yet. Try '/invh save <name>'");
                 return true;
             }
 
             StringBuilder builder = new StringBuilder();
 
-            for (int i = 0; i < files.length; i ++) {
-                String name = files[i].getName();
+            for (int i = 0; i < list.size(); i ++) {
+                String name = list.get(i);
                 builder.append(name);
 
-                if (i + 1 < files.length) {
+                if (i + 1 < list.size()) {
                     builder.append(", ");
                 }
             }
 
-            sender.sendMessage(prefix + "There're " + files.length + " kits: §e" + builder.toString());
+            sender.sendMessage(prefix + "There're " + list.size() + " kits: §e" + builder.toString());
 
             return true;
         } else if (args[0].equalsIgnoreCase("save") && args.length == 2) {
@@ -150,7 +197,7 @@ public class InventoryHolder extends JavaPlugin {
 
             Player player = (Player) sender;
 
-            if (!player.hasPermission("inventoryholder.save")) {
+            if (!player.hasPermission("inventoryholder.admin")) {
                 player.sendMessage(prefix + "You don't have the permission.");
                 return true;
             }
@@ -158,16 +205,40 @@ public class InventoryHolder extends JavaPlugin {
             String name = args[1];
 
             if (exist(name)) {
-                player.sendMessage(prefix + name + " is already taken name, please try other one.");
+                player.sendMessage(prefix + name + " is already taken name, please try another one.");
                 return true;
             }
 
             try {
                 save(player.getInventory(), name);
 
-                player.sendMessage(prefix + "Your inventory has been saved successfully as the kit §e" + name + "§r!");
+                player.sendMessage(prefix + "The kit has been saved successfully!");
             } catch (IOException e) {
                 e.printStackTrace();
+            }
+
+            return true;
+        } else if (args[0].equalsIgnoreCase("delete") && args.length == 2) {
+
+            if (!sender.hasPermission("inventoryholder.admin")) {
+                sender.sendMessage(prefix + "You don't have the permission.");
+                return true;
+            }
+
+            String name = args[1];
+
+            if (!exist(name)) {
+                sender.sendMessage(prefix + "There's no kit named " + name + ".");
+                return true;
+            }
+
+            File file = new File(getDataFolder(), name + ".yml");
+            boolean isDeleted = file.delete();
+
+            if (isDeleted) {
+                sender.sendMessage(prefix + "The kit has been deleted successfully.");
+            } else {
+                sender.sendMessage(prefix + "Failed to delete the file. Please check if other program is using it now.");
             }
 
             return true;
@@ -194,12 +265,12 @@ public class InventoryHolder extends JavaPlugin {
 
             load(player.getInventory(), name);
 
-            player.sendMessage(prefix + "The kit " + name + " has been loaded to your inventory.");
+            player.sendMessage(prefix + "The kit §e" + name + "§r has been loaded to your inventory.");
 
             return true;
         } else if (args[0].equalsIgnoreCase("force") && args.length == 3) {
 
-            if (!sender.hasPermission("inventoryholder.force")) {
+            if (!sender.hasPermission("inventoryholder.admin")) {
                 sender.sendMessage(prefix + "You don't have the permission.");
                 return true;
             }
@@ -220,7 +291,7 @@ public class InventoryHolder extends JavaPlugin {
 
             load(target.getInventory(), name);
 
-            sender.sendMessage(prefix + "The kit " + name + " has been loaded to the inventory of " + target.getName() + ".");
+            sender.sendMessage(prefix + "The kit §e" + name + "§r has been forced to §e" + target.getName() + "§r.");
 
             return true;
         } else {
